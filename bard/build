@@ -1,0 +1,41 @@
+#!/bin/bash -eu
+
+command -v jq >/dev/null 2>&1 || {
+  echo "I require jq but it's not installed. Aborting." >&2
+  exit 1
+}
+
+# Clone upstream project
+UPSTREAM_NAME="bard"
+UPSTREAM_REPO="git@github.com:implydata/$UPSTREAM_NAME.git"
+UPSTREAM_COMMITISH="v0.3.14"
+UPSTREAM_DIR="$TMP_DIR/$UPSTREAM_NAME.git"
+
+git clone "$UPSTREAM_REPO" "$UPSTREAM_DIR"
+(cd "$UPSTREAM_DIR" && git checkout "$UPSTREAM_COMMITISH")
+
+# Build upstream project
+(cd "$UPSTREAM_DIR" && ./full-build)
+
+# Stage bard into dist/
+TARGET_DIR="$STAGING_DIR/dist/$UPSTREAM_NAME"
+mkdir -p "$TARGET_DIR"
+
+cp "$UPSTREAM_DIR"/package.json "$TARGET_DIR/package.json"
+cp -R "$UPSTREAM_DIR"/build "$TARGET_DIR/build"
+cp -R "$UPSTREAM_DIR"/src "$TARGET_DIR/src"       # Contains views
+cp -R "$UPSTREAM_DIR"/assets "$TARGET_DIR/assets"
+
+MODULE_DIR="$TARGET_DIR/node_modules"
+mkdir "$MODULE_DIR"
+
+DEPENDENCIES=$(jq -r '.dependencies | to_entries | .[] | .key' "$UPSTREAM_DIR"/package.json)
+for module in $DEPENDENCIES; do
+  cp -r "$UPSTREAM_DIR"/node_modules/$module "$MODULE_DIR/$module"
+done
+
+# Copy bin, conf
+mkdir -p "$STAGING_DIR/bin" "$STAGING_DIR/conf" "$STAGING_DIR/conf-quickstart"
+cp bard/bin/* "$STAGING_DIR/bin"
+cp -R bard/conf "$STAGING_DIR/conf/bard"
+cp -R bard/conf-quickstart "$STAGING_DIR/conf-quickstart/bard"

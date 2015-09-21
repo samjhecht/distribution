@@ -1,0 +1,45 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+use Fcntl;
+use File::Basename;
+use FindBin;
+use Getopt::Long qw/:config require_order gnu_compat/;
+
+sub usage
+{
+  die "usage: $0 (--restart <service> | --down | --command <other command>) [-S <service dir>]\n";
+}
+
+# Parse arguments
+my %opt = (
+  'svdir' => "$FindBin::Bin/../var/sv",
+);
+
+usage() unless GetOptions(\%opt, 'command=s', 'restart=s', 'down', 'svdir|S=s');
+
+my $command;
+
+if ($opt{command}) {
+  usage() if $command;
+  $command = $opt{command};
+}
+
+if ($opt{down}) {
+  usage() if $command;
+  $command = 'd';
+}
+
+if ($opt{restart}) {
+  usage() if $command;
+  $command = "k $opt{restart}";
+}
+
+usage() unless $command;
+
+my $fifofile = "$opt{svdir}/.ctrl";
+sysopen my $fifofh, $fifofile, O_WRONLY or die "Can't open control fifo, perhaps supervise is not running: $!\n";
+print $fifofh "$command\n";
+close $fifofh;

@@ -1,0 +1,26 @@
+#!/bin/bash -eu
+
+# Declare build version
+if [ "$(git status --porcelain)" != "" ]
+then
+  echo "git checkout not clean!" >&2
+  exit 1
+fi
+
+COMMIT="$(git rev-list --max-count 1 --abbrev-commit head)"
+
+IMPLY_NAME="imply"
+IMPLY_VERSION="0.1-$COMMIT"
+IMPLY_DIR="${IMPLY_NAME}-${IMPLY_VERSION}"
+
+mkdir -p "$STAGING_DIR/$IMPLY_DIR"
+
+STAGING_DIR="$STAGING_DIR/$IMPLY_DIR" quickstart/build
+STAGING_DIR="$STAGING_DIR/$IMPLY_DIR" supervise/build
+STAGING_DIR="$STAGING_DIR/$IMPLY_DIR" zk/build
+STAGING_DIR="$STAGING_DIR/$IMPLY_DIR" bard/build
+STAGING_DIR="$STAGING_DIR/$IMPLY_DIR" druid/build
+
+echo "$IMPLY_VERSION" > "$STAGING_DIR"/build.version
+echo "$IMPLY_VERSION" > "$STAGING_DIR"/"$IMPLY_DIR"/dist/VERSION.txt
+echo "$IMPLY_NAME" > "$STAGING_DIR"/build.name

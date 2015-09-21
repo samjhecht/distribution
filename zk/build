@@ -1,0 +1,27 @@
+#!/bin/bash -eu
+
+# Declare ZK version
+ZK_PACKAGE="zookeeper-3.4.6"
+ZK_TARBALL="${ZK_PACKAGE}.tar.gz"
+
+# ZK
+curl -o "$TMP_DIR"/"$ZK_TARBALL" "http://mirrors.sonic.net/apache/zookeeper/${ZK_PACKAGE}/${ZK_PACKAGE}.tar.gz"
+
+if [ "$(sha1sum "$TMP_DIR"/"$ZK_TARBALL" | awk '{print $1}')" != "2a9e53f5990dfe0965834a525fbcad226bf93474" ]
+then
+  echo "checksum mismatch" >&2
+  exit 1
+fi
+
+mkdir -p "$TMP_DIR/zk" "$STAGING_DIR/dist/zk"
+tar -C "$TMP_DIR/zk" -xzf "$TMP_DIR"/"$ZK_TARBALL"
+
+# Copy zk jars
+mv "$TMP_DIR"/zk/"$ZK_PACKAGE"/"$ZK_PACKAGE".jar "$STAGING_DIR"/dist/zk/"$ZK_PACKAGE".jar
+mv "$TMP_DIR"/zk/"$ZK_PACKAGE"/lib "$STAGING_DIR"/dist/zk/lib
+
+# Copy bin, conf
+mkdir -p "$STAGING_DIR/bin" "$STAGING_DIR/conf" "$STAGING_DIR/conf-quickstart"
+cp zk/bin/* "$STAGING_DIR/bin"
+cp -R zk/conf "$STAGING_DIR/conf/zk"
+cp -R zk/conf-quickstart "$STAGING_DIR/conf-quickstart/zk"

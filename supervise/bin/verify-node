@@ -1,0 +1,17 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+my $node_version = qx[node --version 2>/dev/null];
+if ($?) {
+  die "Please install nodejs version 4.0.0 or better!\n";
+}
+
+# If we know it won't work, die. Otherwise hope for the best.
+chomp $node_version;
+if ($node_version =~ /^v?(\d+)\.(\d+)/ && $1 < 4) {
+  die "Please upgrade nodejs to version 4.0.0 or better! Your current version is: $node_version\n";
+}
+
+exit 0;

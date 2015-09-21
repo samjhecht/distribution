@@ -1,0 +1,28 @@
+#!/usr/bin/env python
+
+import argparse
+import json
+import sys
+import urllib2
+
+parser = argparse.ArgumentParser(description='Issue PlyQL query.')
+parser.add_argument('--url', metavar='url', type=str, default='http://localhost:9095/plyql', help='PlyQL query url')
+parser.add_argument('--output-type', metavar='type', type=str, default='tsv', help='json, tsv, csv')
+parser.add_argument('query', type=str, help='PlyQL query')
+args = parser.parse_args()
+
+data = json.dumps({
+  'query' : args.query,
+  'outputType' : args.output_type
+})
+
+try:
+  req = urllib2.Request(args.url, data, {'Content-Type' : 'application/json'})
+  response = urllib2.urlopen(req)
+  print response.read().rstrip()
+except urllib2.URLError as e:
+  sys.stderr.write("[{0}]\n".format(str(e)))
+  if hasattr(e, 'read'):
+    sys.stderr.write(e.read())
+  sys.stderr.write('\n')
+

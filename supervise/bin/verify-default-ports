@@ -1,0 +1,15 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use Socket;
+
+my @ports = (1527, 2181, 8081, 8082, 8083, 8084, 8085, 9095);
+
+my $tcp = getprotobyname("tcp");
+for my $port (@ports) {
+  socket(my $sock, PF_INET, SOCK_STREAM, $tcp) or die "socket: $!";
+  setsockopt($sock, SOL_SOCKET, SO_REUSEADDR, pack("l", 1)) or die "setsockopt: $!";
+  bind($sock, sockaddr_in($port, INADDR_ANY)) or die "Cannot start up because port[$port] is already in use.\n";
+  close $sock;
+}

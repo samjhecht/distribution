@@ -1,0 +1,5 @@
+#!/bin/bash -eu
+
+mkdir -p "$STAGING_DIR/bin" "$STAGING_DIR/conf"
+cp supervise/bin/* "$STAGING_DIR/bin/"
+cp -R supervise/conf "$STAGING_DIR/conf/supervise"

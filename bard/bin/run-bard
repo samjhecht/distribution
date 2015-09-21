@@ -1,0 +1,25 @@
+#!/bin/bash -eu
+
+if [ "$#" -gt 1 ]
+then
+  echo "usage: $0 [conf-dir]" >&2
+  exit 1
+fi
+
+PWD="$(pwd)"
+WHEREAMI="$(dirname "$0")"
+
+if [ "$#" -lt 1 ] || [ "x$1" = "x" ]
+then
+  CONFDIR="$WHEREAMI"/../conf
+else
+  CONFDIR="$1"
+fi
+
+CONFDIR="$(cd "$CONFDIR" && pwd)/bard"
+WHEREAMI="$(cd "$WHEREAMI" && pwd)"
+
+"$WHEREAMI"/../bin/verify-node
+
+cd "$WHEREAMI/.."
+exec node "$WHEREAMI"/../dist/bard/build/server/www.js -c "$CONFDIR"

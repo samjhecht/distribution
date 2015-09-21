@@ -1,0 +1,86 @@
+#!/usr/bin/env python
+
+import argparse
+import json
+import sys
+import time
+import urllib2
+
+def read_task_file(args):
+  with open(args.file, 'r') as f:
+    contents = f.read()
+    # We don't use the parsed data, but we want to throw early if it's invalid
+    json.loads(contents)
+    return contents
+
+# Keep trying until timeout_at, maybe die then
+def post_task(args, task_json, timeout_at):
+  try:
+    url = args.url.rstrip("/") + "/druid/indexer/v1/task"
+    req = urllib2.Request(url, task_json, {'Content-Type' : 'application/json'})
+    timeleft = timeout_at - time.time()
+    response_timeout = min(max(timeleft, 5), 10)
+    response = urllib2.urlopen(req, None, response_timeout)
+    return response.read().rstrip()
+  except urllib2.URLError as e:
+    if isinstance(e, urllib2.HTTPError) and e.code >= 400 and e.code <= 500:
+      # 4xx (problem with the request) or 500 (something wrong on the server)
+      raise
+    elif time.time() >= timeout_at:
+      raise
+    else:
+      # If at first you don't succeed, try, try again!
+      sleep_time = 5
+      if not args.quiet:
+        extra = ''
+        if hasattr(e, 'read'):
+          extra = e.read().rstrip()
+        sys.stderr.write("Waiting up to {}s for indexing service to become available. [Got: {} {}]".format(max(sleep_time, int(timeout_at - time.time())), str(e), extra).rstrip())
+        sys.stderr.write("\n")
+      time.sleep(sleep_time)
+      return post_task(args, task_json, timeout_at)
+
+# Keep trying until timeout_at, maybe die then
+def await_task_completion(args, task_id, timeout_at):
+  url = args.url.rstrip("/") + "/druid/indexer/v1/task/{}/status".format(task_id)
+  req = urllib2.Request(url)
+  timeleft = timeout_at - time.time()
+  response_timeout = min(max(timeleft, 5), 10)
+  response = urllib2.urlopen(req, None, response_timeout)
+  response_obj = json.loads(response.read())
+  response_status_code = response_obj["status"]["status"]
+  if response_status_code in ['SUCCESS', 'FAILED']:
+    return response_status_code
+  else:
+    if time.time() < timeout_at:
+      if not args.quiet:
+        sys.stderr.write("Task {} still running...\n".format(task_id))
+      time.sleep(5)
+      return await_task_completion(args, task_id, timeout_at)
+    else:
+      raise Exception("Task {} did not finish in time!")
+
+def main():
+  parser = argparse.ArgumentParser(description='Post Druid indexing tasks.')
+  parser.add_argument('--url', '-u', metavar='url', type=str, default='http://localhost:8084/', help='Druid Overlord url')
+  parser.add_argument('--file', '-f', type=str, required=True, help='Query JSON file')
+  parser.add_argument('--submit-timeout', type=int, default=60, help='Timeout (in seconds) for submitting tasks')
+  parser.add_argument('--complete-timeout', type=int, default=14400, help='Timeout (in seconds) for completing tasks')
+  parser.add_argument('--quiet', '-q', action='store_true', help='Suppress retryable errors')
+  args = parser.parse_args()
+
+  submit_timeout_at = time.time() + args.submit_timeout
+  complete_timeout_at = time.time() + args.complete_timeout
+
+  task_id = json.loads(post_task(args, read_task_file(args), submit_timeout_at))["task"]
+  sys.stderr.write('\033[1m' + "Task started: " + '\033[0m' + "{}\n".format(task_id))
+  sys.stderr.write('\033[1m' + "Task log:     " + '\033[0m' + "{}/druid/indexer/v1/task/{}/log\n".format(args.url.rstrip("/"),task_id))
+  sys.stderr.write('\033[1m' + "Task status:  " + '\033[0m' + "{}/druid/indexer/v1/task/{}/status\n".format(args.url.rstrip("/"),task_id))
+
+  task_status = await_task_completion(args, task_id, complete_timeout_at)
+  sys.stderr.write("Task finished with status: {}\n".format(task_status))
+
+try:
+  main()
+except KeyboardInterrupt:
+  sys.exit(1)

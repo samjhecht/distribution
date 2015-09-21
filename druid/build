@@ -1,0 +1,57 @@
+#!/bin/bash -eu
+
+# Clone upstream project
+UPSTREAM_NAME="druid"
+UPSTREAM_REPO="git@github.com:implydata/$UPSTREAM_NAME.git"
+UPSTREAM_COMMITISH="druid-0.8.1-iap2"
+UPSTREAM_DIR="$TMP_DIR/$UPSTREAM_NAME.git"
+
+# We're including derbytools too
+DERBYTOOLS_VERSION="10.11.1.1"
+
+git clone "$UPSTREAM_REPO" "$UPSTREAM_DIR"
+(cd "$UPSTREAM_DIR" && git checkout "$UPSTREAM_COMMITISH")
+
+UPSTREAM_COMMIT=$(cd "$UPSTREAM_DIR" && git rev-list --max-count 1 --abbrev-commit head)
+
+# Build upstream project, skipTests because tests were already run on this tag
+(cd "$UPSTREAM_DIR" && mvn package -DskipTests)
+
+# Stage upstream project
+mkdir -p "$STAGING_DIR/dist"
+tar -C "$TMP_DIR" -xzf "$UPSTREAM_DIR"/distribution/target/druid-*-bin.tar.gz
+mv "$TMP_DIR"/druid-* "$STAGING_DIR/dist/druid"
+
+# Run pull-deps for all builtin extensions
+java \
+  -cp "$STAGING_DIR/dist/druid/lib/*" \
+  -Ddruid.extensions.coordinates='["io.druid.extensions:druid-azure-extensions", "io.druid.extensions:druid-examples", "io.druid.extensions:druid-hdfs-storage", "io.druid.extensions:druid-histogram", "io.druid.extensions:druid-kafka-eight", "io.druid.extensions:druid-kafka-extraction-namespace", "io.druid.extensions:druid-namespace-lookup", "io.druid.extensions:druid-rabbitmq", "io.druid.extensions:druid-s3-extensions", "io.druid.extensions:mysql-metadata-storage", "io.druid.extensions:postgresql-metadata-storage"]' \
+  -Ddruid.extensions.localRepository="$STAGING_DIR/dist/druid/extensions-repo" \
+  io.druid.cli.Main tools pull-deps
+
+# Add derbytools to lib
+DERBYTOOLS_LOCATION="$STAGING_DIR/dist/druid/lib/derbytools-$DERBYTOOLS_VERSION.jar"
+curl -Lo "$DERBYTOOLS_LOCATION" "http://search.maven.org/remotecontent?filepath=org/apache/derby/derbytools/$DERBYTOOLS_VERSION/derbytools-$DERBYTOOLS_VERSION.jar"
+
+if [ "$(sha1sum "$DERBYTOOLS_LOCATION" | awk '{print $1}')" != "10a124a8962c6f8ea70a368d711ce6883889ca34" ]
+then
+  echo "$DERBYTOOLS_LOCATION: checksum mismatch" >&2
+  exit 1
+fi
+
+# Put druid on a diet
+for JAR in "$STAGING_DIR"/dist/druid/lib/*.jar
+do
+  JARNAME="$(basename "$JAR")"
+  FOUND="$(cd "$STAGING_DIR"/dist/druid && find extensions-repo -name "$JARNAME")"
+  if [ "x$FOUND" != "x" ]
+  then
+    ln -sf "../$FOUND" "$JAR"
+  fi
+done
+
+# Copy bin, conf
+mkdir -p "$STAGING_DIR/bin" "$STAGING_DIR/conf" "$STAGING_DIR/conf-quickstart"
+cp druid/bin/* "$STAGING_DIR/bin"
+cp -R druid/conf "$STAGING_DIR/conf/druid"
+cp -R druid/conf-quickstart "$STAGING_DIR/conf-quickstart/druid"

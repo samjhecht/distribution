@@ -1,0 +1,26 @@
+#!/bin/bash -eu
+
+if [ "$#" -gt 2 ]
+then
+  echo "usage: $0 <service> [conf-dir]" >&2
+  exit 1
+fi
+
+PWD="$(pwd)"
+WHEREAMI="$(dirname "$0")"
+WHATAMI="$1"
+
+if [ "$#" -eq 1 ]
+then
+  CONFDIR="$WHEREAMI/../conf"
+else
+  CONFDIR="$2"
+fi
+
+CONFDIR="$(cd "$CONFDIR" && pwd)/druid"
+WHEREAMI="$(cd "$WHEREAMI" && pwd)"
+
+cd "$WHEREAMI/.."
+exec java `cat "$CONFDIR"/"$WHATAMI"/jvm.config | xargs` \
+  -cp "$CONFDIR"/_common:"$CONFDIR"/"$WHATAMI":`ls "$WHEREAMI"/../dist/druid/lib/*.jar | xargs | tr ' ' ':'` \
+  `cat "$CONFDIR"/$WHATAMI/main.config | xargs`

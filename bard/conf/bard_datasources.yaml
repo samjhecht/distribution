@@ -1,0 +1,5 @@
+# The data sources that you have configured, these will appear, in order, inside the navigation menu of Pivot
+# In general there can be two types of 'engine':
+#   - native: a JSON file that is crunched within plywood itself (useful for small datasets and testing)
+#   - druid: a Druid dataSource
+dataSources: []

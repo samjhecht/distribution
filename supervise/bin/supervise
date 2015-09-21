@@ -1,0 +1,274 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use POSIX qw/:sys_wait_h mkfifo/;
+use Fcntl qw/:DEFAULT :flock/;
+use Getopt::Long qw/:config require_order gnu_compat/;
+use FindBin;
+use File::Spec;
+
+sub logdie($)
+{
+  my ($msg) = @_;
+  chomp $msg;
+  die "[" . localtime . "] $msg\n";
+}
+
+sub logit($)
+{
+  my ($msg) = @_;
+  chomp $msg;
+  warn "[" . localtime . "] $msg\n";
+}
+
+sub usage
+{
+  die "usage: $0 -c <conf file> [-d <var dir>] [-t <kill timeout>]\n";
+}
+
+sub read_config_file
+{
+  my ($config_file) = @_;
+
+  open my $config_fh, "<", $config_file
+    or die "open $config_file: $!";
+
+  my @commands;
+  my @verify;
+  while (my $line = <$config_fh>) {
+    chomp $line;
+    next if $line =~ /^(\s*\#.*|\s*)$/;
+
+    if ($line =~ /^(:verify|[^:]\S+)\s+(.+)$/) {
+      my $name = $1;
+      my $command = $2;
+
+      if ($name eq ':verify') {
+        push @verify, $command;
+      } else {
+        die "Duplicate command: $line\n" if grep { $_->{name} eq $name } @commands;
+        push @commands, {
+          name => $name,
+          command => $command,
+          pid => 0,      # Current pid, or 0 if not running
+          down => 0,     # Time the proc should be down until
+          killed => 0,   # Signal we sent to this process
+        };
+      }
+    } else {
+      die "Syntax error: $line\n";
+    }
+  }
+
+  close $config_fh;
+  return { commands => \@commands, verify => \@verify };
+}
+
+sub stringify_exit_status
+{
+  my ($status) = @_;
+  my $string;
+  my $signal = $status & 127;
+  my $cored = $status & 128;
+  my $code = $status >> 8;
+
+  if ($signal) {
+    $string = "signal = $signal";
+  } else {
+    $string = "exited = $code";
+  }
+
+  if ($cored) {
+    $string = $string . ", dumped core";
+  }
+
+  return $string;
+}
+
+sub open_control_fifo
+{
+  my ($svdir) = @_;
+  my $fifofile = "$svdir/.ctrl";
+  if (-e $fifofile) {
+    unlink $fifofile or die "Cannot remove fifo: $fifofile\n";
+  }
+  mkfifo($fifofile, 0700) or die "Cannot create fifo: $fifofile\n";
+  sysopen my $fifofh, $fifofile, O_NONBLOCK | O_RDWR or die "Cannot open fifo for reading: $fifofile\n";
+  return $fifofh;
+}
+
+my @commands;
+my $killed = 0;
+my $killkill = 0;
+
+# We'll do our own reaping
+$SIG{CHLD} = sub {};
+
+# Redirect stderr to stdout
+open STDERR, ">&STDOUT" or die;
+
+# Parse arguments
+my %opt = (
+  'chdir' => "$FindBin::Bin/..",
+  'vardir' => "$FindBin::Bin/../var",
+  'kill-timeout' => 10,
+);
+
+usage() unless GetOptions(
+  \%opt,
+  'conf|c=s',
+  'vardir|d=s',
+  'kill-timeout|t=i',
+  'chdir=s',
+);
+
+usage() unless $opt{'conf'} && $opt{'vardir'};
+
+# Read config file
+my $config = read_config_file($opt{'conf'});
+@commands = @{$config->{commands}};
+
+if (!@commands) {
+  die "Nothing to run.\n";
+}
+
+# Remember where vardir, svdir are after chdiring
+my $vardir = File::Spec->rel2abs($opt{vardir});
+my $svdir = "$vardir/sv";
+
+# chdir to the root of the distribution (or whereever)
+chdir($opt{chdir}) or die "chdir[$opt{chdir}] failed: $!\n";
+
+# Create vardir with tmp/
+if (! -e "$vardir/tmp") {
+  system("mkdir -p \Q$vardir\E/tmp") == 0 or die "mkdir $vardir/tmp failed: $!\n";
+}
+
+# Create svdir
+if (! -e $svdir) {
+  system("mkdir -p \Q$svdir\E") == 0 or die "mkdir $svdir failed: $!\n";
+}
+
+# Lock svdir and keep it locked until we exit
+my $lockfile = "$svdir/.lock";
+open my $lockfh, ">", $lockfile or die "Cannot write to svdir, please check permissions: $svdir\n";
+flock($lockfh, LOCK_EX | LOCK_NB) or die "Cannot lock svdir, maybe another 'supervise' is running: $svdir\n";
+
+# Create control fifo in svdir
+my $fifofh = open_control_fifo($svdir);
+
+# Run verification commands
+for my $verify_cmd (@{$config->{verify}}) {
+  system($verify_cmd) == 0 or exit 1;
+}
+
+# Catch killy signals and do an orderly shutdown
+$SIG{HUP} = sub { if (!$killed) { $killed = 1; $killkill = time + $opt{'kill-timeout'}; } };
+$SIG{INT} = sub { if (!$killed) { $killed = 2; $killkill = time + $opt{'kill-timeout'}; } };
+$SIG{TERM} = sub { if (!$killed) { $killed = 15; $killkill = time + $opt{'kill-timeout'}; } };
+
+# Build up control fifo command over multiple sysreads, potentially
+my $fifobuffer = '';
+
+while (1) {
+  # Spawn new procs
+  if (!$killed) {
+    for my $command (grep { !$_->{pid} } @commands) {
+      if ($command->{down} < time) {
+        my $logfile = "$svdir/$command->{name}.log";
+
+        logit "Running command[$command->{name}], logging to[$logfile]: $command->{command}";
+
+        if (my $pid = fork) {
+          $command->{pid} = $pid;
+          $command->{logfile} = $logfile;
+        } else {
+          open STDOUT, ">>", $logfile or logdie "open $logfile failed: $!\n";
+          open STDERR, ">&STDOUT" or logdie "redirecting stderr failed: $!\n";
+          exec('sh', '-c', "exec $command->{command}") or logdie "exec [$command->{command}] failed: $!";
+        }
+      }
+    }
+  }
+
+  # Reap dead procs
+  my $pid;
+  while (($pid = waitpid(-1, WNOHANG)) > 0) {
+    my $status = $?;
+    my ($command) = (grep { $_->{pid} eq $pid } @commands);
+    if ($command) {
+      $command->{pid} = 0;
+      $command->{down} = time + 2;
+      logit "Command[$command->{name}] exited (pid = $pid, " . stringify_exit_status($status) . ")";
+      if (($status >> 8) && !$killed) {
+        # Nonzero exit status
+        logit "Command[$command->{name}] failed, see logfile for more details: $command->{logfile}";
+      }
+    } else {
+      logit "ERR: Reaped unknown command (pid = $pid, " . stringify_exit_status($status) . ")";
+    }
+  }
+
+  # Kill procs, maybe
+  if ($killed) {
+    for my $command (grep { $_->{pid} } @commands) {
+      my $should_killkill = time > $killkill;
+      my $want_signal;
+      if ($command->{killed} == 9 || $should_killkill) {
+        $want_signal = 9;
+      } else {
+        $want_signal = 15;
+      }
+
+      if ($command->{killed} != $want_signal) {
+        logit "Sending signal[$want_signal] to command[$command->{name}].";
+        kill $want_signal, $command->{pid} or logit "WARN: Could not signal pid: $command->{pid}";
+        $command->{killed} = $want_signal;
+      }
+    }
+  }
+
+  # Kill ourselves, maybe
+  if ($killed && ! grep { $_->{pid} } @commands) {
+    logit "Exiting.";
+    $SIG{HUP} = $SIG{INT} = $SIG{TERM} = 'DEFAULT';
+    if ($killed > 0) {
+      kill $killed, $$;
+    } else {
+      # Normal exit
+      exit 0;
+    }
+  }
+
+  # Be controlled, maybe
+  my $fifostr = "";
+  if (sysread $fifofh, $fifostr, 4096) {
+    $fifobuffer .= $fifostr;
+
+    while ($fifobuffer =~ /^([^\n]*)\n(.*)/s) {
+      my $fifocmd = $1;
+      $fifobuffer = $2;
+      if ($fifocmd =~ /^k (.+)$/ && !$killed) {
+        my $name = $1;
+        my ($command) = grep { $_->{name} eq $name && $_->{pid} } @commands;
+        if ($command) {
+          logit "Restarting command[$name].";
+          kill TERM => $command->{pid};
+        } else {
+          logit "Asked to restart unknown command[$name], ignoring.";
+        }
+      } elsif ($fifocmd eq 'd') {
+        # -1 means exit without signal
+        $killed = -1;
+        $killkill = time + $opt{'kill-timeout'}
+      } else {
+        logit "Received unknown control command, ignoring.";
+      }
+    }
+  }
+
+  sleep 1;
+}
+
+exit 0;

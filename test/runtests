@@ -1,0 +1,29 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use FindBin;
+use TAP::Harness;
+use Getopt::Long;
+
+my %opt = (
+  'tarball' => ''
+);
+GetOptions(\%opt, "tarball=s") or die;
+
+if (! -e $opt{tarball}) {
+  die "tarball[$opt{tarball}] does not exist";
+}
+
+my $harness = TAP::Harness->new({
+  verbosity => 1,
+  lib => ['test/lib']
+});
+
+my @tests = @ARGV ? @ARGV : glob "test/*.t";
+if (!@tests) {
+  die "no tests found\n";
+}
+
+$ENV{TARBALL} = $opt{tarball};
+$harness->runtests(@tests);

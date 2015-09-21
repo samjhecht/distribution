@@ -1,0 +1,16 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+my $java_version = qx[java -version 2>&1];
+if ($?) {
+  die "Please install Java 7 or better!\n";
+}
+
+# If we know it won't work, die. Otherwise hope for the best.
+if ($java_version =~ /java version \"((\d+)\.(\d+).*?)\"/ && ($2 < 1 || $3 < 7)) {
+  die "Please upgrade to Java 7 or better! Your current version is: $1\n";
+}
+
+exit 0;

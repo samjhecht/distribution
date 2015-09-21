@@ -1,0 +1,26 @@
+#!/bin/bash -eu
+
+if [ "$#" -gt 1 ]
+then
+  echo "usage: $0 [conf-dir]" >&2
+  exit 1
+fi
+
+PWD="$(pwd)"
+WHEREAMI="$(dirname "$0")"
+
+if [ "$#" -lt 1 ] || [ "x$1" = "x" ]
+then
+  CONFDIR="$WHEREAMI"/../conf
+else
+  CONFDIR="$1"
+fi
+
+CONFDIR="$(cd "$CONFDIR" && pwd)/zk"
+WHEREAMI="$(cd "$WHEREAMI" && pwd)"
+
+cd "$WHEREAMI/.."
+exec java `cat "$CONFDIR"/jvm.config | xargs` \
+  -cp "$WHEREAMI/../dist/zk/lib/*:$WHEREAMI/../dist/zk/*:$CONFDIR" \
+  org.apache.zookeeper.server.quorum.QuorumPeerMain \
+  "$CONFDIR"/zoo.cfg
