@@ -11,7 +11,7 @@ WHEREAMI="$(dirname "$0")"
 
 if [ "$#" -lt 1 ] || [ "x$1" = "x" ]
 then
-  CONFDIR="$WHEREAMI"/../conf/druid
+  CONFDIR="$WHEREAMI"/../conf-quickstart/druid
 else
   CONFDIR="$1"
 fi
