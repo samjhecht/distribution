@@ -42,23 +42,24 @@ def post_task(args, task_json, timeout_at):
 
 # Keep trying until timeout_at, maybe die then
 def await_task_completion(args, task_id, timeout_at):
-  url = args.url.rstrip("/") + "/druid/indexer/v1/task/{}/status".format(task_id)
-  req = urllib2.Request(url)
-  timeleft = timeout_at - time.time()
-  response_timeout = min(max(timeleft, 5), 10)
-  response = urllib2.urlopen(req, None, response_timeout)
-  response_obj = json.loads(response.read())
-  response_status_code = response_obj["status"]["status"]
-  if response_status_code in ['SUCCESS', 'FAILED']:
-    return response_status_code
-  else:
-    if time.time() < timeout_at:
-      if not args.quiet:
-        sys.stderr.write("Task {} still running...\n".format(task_id))
-      time.sleep(5)
-      return await_task_completion(args, task_id, timeout_at)
+  while True:
+    url = args.url.rstrip("/") + "/druid/indexer/v1/task/{}/status".format(task_id)
+    req = urllib2.Request(url)
+    timeleft = timeout_at - time.time()
+    response_timeout = min(max(timeleft, 5), 10)
+    response = urllib2.urlopen(req, None, response_timeout)
+    response_obj = json.loads(response.read())
+    response_status_code = response_obj["status"]["status"]
+    if response_status_code in ['SUCCESS', 'FAILED']:
+      return response_status_code
     else:
-      raise Exception("Task {} did not finish in time!")
+      if time.time() < timeout_at:
+        if not args.quiet:
+          sys.stderr.write("Task {} still running...\n".format(task_id))
+        timeleft = timeout_at - time.time()
+        time.sleep(min(5, timeleft))
+      else:
+        raise Exception("Task {} did not finish in time!")
 
 def main():
   parser = argparse.ArgumentParser(description='Post Druid indexing tasks.')
