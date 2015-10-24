@@ -10,7 +10,11 @@ def read_task_file(args):
   with open(args.file, 'r') as f:
     contents = f.read()
     # We don't use the parsed data, but we want to throw early if it's invalid
-    json.loads(contents)
+    try:
+      json.loads(contents)
+    except Exception, e:
+      sys.stderr.write('Invalid JSON in task file "{}": {}\n'.format(args.file, repr(e)))
+      sys.exit(1)
     return contents
 
 # Keep trying until timeout_at, maybe die then
