@@ -67,7 +67,7 @@ def await_task_completion(args, task_id, timeout_at):
 
 def main():
   parser = argparse.ArgumentParser(description='Post Druid indexing tasks.')
-  parser.add_argument('--url', '-u', metavar='url', type=str, default='http://localhost:8084/', help='Druid Overlord url')
+  parser.add_argument('--url', '-u', metavar='url', type=str, default='http://localhost:8090/', help='Druid Overlord url')
   parser.add_argument('--file', '-f', type=str, required=True, help='Query JSON file')
   parser.add_argument('--submit-timeout', type=int, default=60, help='Timeout (in seconds) for submitting tasks')
   parser.add_argument('--complete-timeout', type=int, default=14400, help='Timeout (in seconds) for completing tasks')

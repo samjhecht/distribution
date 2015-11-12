@@ -78,7 +78,7 @@ sub runtask
   $self->backtick([
     "bin/post-index-task",
     '-f', File::Spec->rel2abs($index_file),
-    '-u', 'http://localhost:8084/'
+    '-u', 'http://localhost:8090/'
   ]);
 
   1;

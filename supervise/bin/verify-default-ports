@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use Socket;
 
-my @ports = (1527, 2181, 8081, 8082, 8083, 8084, 8085, 9095);
+my @ports = (1527, 2181, 8081, 8082, 8083, 8090, 8091, 9095);
 
 my $tcp = getprotobyname("tcp");
 for my $port (@ports) {
