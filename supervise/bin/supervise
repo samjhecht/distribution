@@ -235,6 +235,7 @@ while (1) {
     $SIG{HUP} = $SIG{INT} = $SIG{TERM} = 'DEFAULT';
     if ($killed > 0) {
       kill $killed, $$;
+      exit 1;
     } else {
       # Normal exit
       exit 0;
