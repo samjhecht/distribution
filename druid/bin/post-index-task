@@ -13,7 +13,7 @@ def read_task_file(args):
     try:
       json.loads(contents)
     except Exception, e:
-      sys.stderr.write('Invalid JSON in task file "{}": {}\n'.format(args.file, repr(e)))
+      sys.stderr.write('Invalid JSON in task file "{0}": {}\n'.format(args.file, repr(e)))
       sys.exit(1)
     return contents
 
@@ -39,7 +39,7 @@ def post_task(args, task_json, timeout_at):
         extra = ''
         if hasattr(e, 'read'):
           extra = e.read().rstrip()
-        sys.stderr.write("Waiting up to {}s for indexing service to become available. [Got: {} {}]".format(max(sleep_time, int(timeout_at - time.time())), str(e), extra).rstrip())
+        sys.stderr.write("Waiting up to {0}s for indexing service to become available. [Got: {1} {2}]".format(max(sleep_time, int(timeout_at - time.time())), str(e), extra).rstrip())
         sys.stderr.write("\n")
       time.sleep(sleep_time)
       return post_task(args, task_json, timeout_at)
@@ -47,7 +47,7 @@ def post_task(args, task_json, timeout_at):
 # Keep trying until timeout_at, maybe die then
 def await_task_completion(args, task_id, timeout_at):
   while True:
-    url = args.url.rstrip("/") + "/druid/indexer/v1/task/{}/status".format(task_id)
+    url = args.url.rstrip("/") + "/druid/indexer/v1/task/{0}/status".format(task_id)
     req = urllib2.Request(url)
     timeleft = timeout_at - time.time()
     response_timeout = min(max(timeleft, 5), 10)
@@ -59,11 +59,11 @@ def await_task_completion(args, task_id, timeout_at):
     else:
       if time.time() < timeout_at:
         if not args.quiet:
-          sys.stderr.write("Task {} still running...\n".format(task_id))
+          sys.stderr.write("Task {0} still running...\n".format(task_id))
         timeleft = timeout_at - time.time()
         time.sleep(min(5, timeleft))
       else:
-        raise Exception("Task {} did not finish in time!")
+        raise Exception("Task {0} did not finish in time!".format(task_id))
 
 def main():
   parser = argparse.ArgumentParser(description='Post Druid indexing tasks.')
@@ -78,12 +78,12 @@ def main():
   complete_timeout_at = time.time() + args.complete_timeout
 
   task_id = json.loads(post_task(args, read_task_file(args), submit_timeout_at))["task"]
-  sys.stderr.write('\033[1m' + "Task started: " + '\033[0m' + "{}\n".format(task_id))
-  sys.stderr.write('\033[1m' + "Task log:     " + '\033[0m' + "{}/druid/indexer/v1/task/{}/log\n".format(args.url.rstrip("/"),task_id))
-  sys.stderr.write('\033[1m' + "Task status:  " + '\033[0m' + "{}/druid/indexer/v1/task/{}/status\n".format(args.url.rstrip("/"),task_id))
+  sys.stderr.write('\033[1m' + "Task started: " + '\033[0m' + "{0}\n".format(task_id))
+  sys.stderr.write('\033[1m' + "Task log:     " + '\033[0m' + "{0}/druid/indexer/v1/task/{1}/log\n".format(args.url.rstrip("/"),task_id))
+  sys.stderr.write('\033[1m' + "Task status:  " + '\033[0m' + "{0}/druid/indexer/v1/task/{1}/status\n".format(args.url.rstrip("/"),task_id))
 
   task_status = await_task_completion(args, task_id, complete_timeout_at)
-  sys.stderr.write("Task finished with status: {}\n".format(task_status))
+  sys.stderr.write("Task finished with status: {0}\n".format(task_status))
 
 try:
   main()
