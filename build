@@ -10,7 +10,7 @@ fi
 COMMIT="$(git rev-list --max-count 1 --abbrev-commit HEAD)"
 
 IMPLY_NAME="imply"
-IMPLY_VERSION="1.0.1-$COMMIT"
+IMPLY_VERSION="1.0.1"
 IMPLY_DIR="${IMPLY_NAME}-${IMPLY_VERSION}"
 
 mkdir -p "$STAGING_DIR/$IMPLY_DIR"
