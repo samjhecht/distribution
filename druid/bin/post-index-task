@@ -5,6 +5,7 @@ import json
 import sys
 import time
 import urllib2
+import urlparse
 
 def read_task_file(args):
   with open(args.file, 'r') as f:
@@ -13,7 +14,7 @@ def read_task_file(args):
     try:
       json.loads(contents)
     except Exception, e:
-      sys.stderr.write('Invalid JSON in task file "{0}": {}\n'.format(args.file, repr(e)))
+      sys.stderr.write('Invalid JSON in task file "{0}": {1}\n'.format(args.file, repr(e)))
       sys.exit(1)
     return contents
 
@@ -32,6 +33,13 @@ def post_task(args, task_json, timeout_at):
       raise
     elif time.time() >= timeout_at:
       raise
+    elif isinstance(e, urllib2.HTTPError) and e.code in [301, 302, 303, 305, 307] and \
+        e.info().getheader("Location") is not None:
+      # Set the new location in args.url so it can be used by await_task_completion and re-issue the request
+      location = urlparse.urlparse(e.info().getheader("Location"))
+      args.url = "{0}://{1}".format(location.scheme, location.netloc)
+      sys.stderr.write("Redirect response received, setting url to [{0}]\n".format(args.url))
+      return post_task(args, task_json, timeout_at)
     else:
       # If at first you don't succeed, try, try again!
       sleep_time = 5
@@ -84,6 +92,8 @@ def main():
 
   task_status = await_task_completion(args, task_id, complete_timeout_at)
   sys.stderr.write("Task finished with status: {0}\n".format(task_status))
+  if task_status == 'FAILED':
+    sys.exit(1)
 
 try:
   main()
