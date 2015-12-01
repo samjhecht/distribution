@@ -92,7 +92,7 @@ def main():
 
   task_status = await_task_completion(args, task_id, complete_timeout_at)
   sys.stderr.write("Task finished with status: {0}\n".format(task_status))
-  if task_status == 'FAILED':
+  if task_status != 'SUCCESS':
     sys.exit(1)
 
 try:
