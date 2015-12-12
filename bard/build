@@ -8,14 +8,14 @@ command -v jq >/dev/null 2>&1 || {
 # Clone upstream project
 UPSTREAM_NAME="bard"
 UPSTREAM_REPO="https://github.com/implydata/$UPSTREAM_NAME.git"
-UPSTREAM_COMMITISH="v0.4.8"
+UPSTREAM_COMMITISH="v0.5.2"
 UPSTREAM_DIR="$TMP_DIR/$UPSTREAM_NAME.git"
 
 git clone "$UPSTREAM_REPO" "$UPSTREAM_DIR"
 (cd "$UPSTREAM_DIR" && git checkout "$UPSTREAM_COMMITISH")
 
 # Build upstream project
-(cd "$UPSTREAM_DIR" && ./full-build)
+(cd "$UPSTREAM_DIR" && ./script/prod-build)
 
 # Stage bard into dist/
 TARGET_DIR="$STAGING_DIR/dist/$UPSTREAM_NAME"
