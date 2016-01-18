@@ -1,13 +1,13 @@
 #!/bin/bash -eu
 
 # Declare ZK version
-ZK_PACKAGE="zookeeper-3.4.7"
+ZK_PACKAGE="zookeeper-3.4.6"
 ZK_TARBALL="${ZK_PACKAGE}.tar.gz"
 
 # ZK
-curl -o "$TMP_DIR"/"$ZK_TARBALL" "http://apache.mirrors.pair.com/zookeeper/${ZK_PACKAGE}/${ZK_PACKAGE}.tar.gz"
+curl -o "$TMP_DIR"/"$ZK_TARBALL" "http://mirrors.sonic.net/apache/zookeeper/${ZK_PACKAGE}/${ZK_PACKAGE}.tar.gz"
 
-if [ "$(sha1sum "$TMP_DIR"/"$ZK_TARBALL" | awk '{print $1}')" != "91bf9d2345879f9c014b0d1c0db326d7331ef73e" ]
+if [ "$(sha1sum "$TMP_DIR"/"$ZK_TARBALL" | awk '{print $1}')" != "2a9e53f5990dfe0965834a525fbcad226bf93474" ]
 then
   echo "checksum mismatch" >&2
   exit 1
