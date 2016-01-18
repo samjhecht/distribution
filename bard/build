@@ -8,10 +8,10 @@ command -v jq >/dev/null 2>&1 || {
 # Clone upstream project
 UPSTREAM_NAME="bard"
 UPSTREAM_REPO="https://github.com/implydata/$UPSTREAM_NAME.git"
-UPSTREAM_COMMITISH="v0.5.2"
+UPSTREAM_COMMITISH="v0.6.5"
 UPSTREAM_DIR="$TMP_DIR/$UPSTREAM_NAME.git"
 
-git clone "$UPSTREAM_REPO" "$UPSTREAM_DIR"
+git clone -b "$UPSTREAM_COMMITISH" --single-branch --depth 1 "$UPSTREAM_REPO" "$UPSTREAM_DIR"
 (cd "$UPSTREAM_DIR" && git checkout "$UPSTREAM_COMMITISH")
 
 # Build upstream project
