@@ -1,0 +1,25 @@
+#!/bin/bash -eu
+
+# Clone upstream project
+UPSTREAM_NAME="tranquility"
+UPSTREAM_REPO="https://github.com/druid-io/$UPSTREAM_NAME.git"
+UPSTREAM_COMMITISH="v0.7.2"
+UPSTREAM_DIR="$TMP_DIR/$UPSTREAM_NAME.git"
+
+git clone -b "$UPSTREAM_COMMITISH" --single-branch --depth 1 "$UPSTREAM_REPO" "$UPSTREAM_DIR"
+(cd "$UPSTREAM_DIR" && git checkout "$UPSTREAM_COMMITISH")
+
+# Build upstream project, skipTests because tests were already run on this tag
+(cd "$UPSTREAM_DIR" && sbt ++2.11.7 'project distribution' universal:packageZipTarball)
+
+# Stage upstream project
+mkdir -p "$STAGING_DIR/dist"
+tar -C "$TMP_DIR" -xzf "$UPSTREAM_DIR"/distribution/target/universal/tranquility-distribution-*.tgz
+mv "$TMP_DIR"/tranquility-distribution-* "$STAGING_DIR/dist/tranquility"
+
+# Copy bin, conf
+mkdir -p "$STAGING_DIR/bin" "$STAGING_DIR/conf" "$STAGING_DIR/conf-quickstart"
+cp -R tranquility/bin/* "$STAGING_DIR/bin/"
+ln -s ../dist/tranquility/bin/tranquility "$STAGING_DIR"/bin/tranquility
+cp -R tranquility/conf "$STAGING_DIR/conf/tranquility"
+cp -R tranquility/conf-quickstart "$STAGING_DIR/conf-quickstart/tranquility"

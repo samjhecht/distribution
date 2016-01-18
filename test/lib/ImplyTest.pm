@@ -32,7 +32,7 @@ sub new
     '/usr/bin/env',
     'perl', '-pi', '-e',
     's/druid.coordinator.period=.*/druid.coordinator.period=PT1S/g',
-    "$implydir/conf/druid/coordinator/runtime.properties"
+    "$implydir/conf-quickstart/druid/coordinator/runtime.properties"
   ) == 0 or die;
 
   return bless {
@@ -100,31 +100,33 @@ sub await_load
     } else {
       return $rsp->{$datasource};
     }
-  }, tries => 150);
+  }, tries => 200);
 }
 
 sub query_druid
 {
-  my ($self, $query_object) = @_;
+  my ($self, $query_object, %args) = @_;
   my $query_json = JSON::encode_json($query_object);
   my ($query_fh, $query_file) = File::Temp::tempfile(UNLINK => 1, TEMPLATE => "iap-test-query-XXXXX");
   print $query_fh $query_json;
   close $query_fh;
 
-  my $rsp = JSON::decode_json($self->backtick([
-    "curl",
-    "-f",
-    "-L",
-    "-HContent-Type: application/json",
-    "-XPOST",
-    "--data-binary", '@' . File::Spec->rel2abs($query_file),
-    "http://localhost:8082/druid/v2"
-  ]));
-  if (@$rsp) {
-    return $rsp;
-  } else {
-    die "no results returned";
-  }
+  return retry(sub {
+    my $rsp = JSON::decode_json($self->backtick([
+      "curl",
+      "-f",
+      "-L",
+      "-HContent-Type: application/json",
+      "-XPOST",
+      "--data-binary", '@' . File::Spec->rel2abs($query_file),
+      "http://localhost:8082/druid/v2"
+    ]));
+    if (@$rsp) {
+      return $rsp;
+    } else {
+      die "no results returned";
+    }
+  }, tries => ($args{tries} || 0));
 }
 
 sub get_pivot_config
@@ -174,6 +176,27 @@ sub post_bard
       die "no results returned";
     }
   }, tries => 15);
+}
+
+sub post_tranq
+{
+  my ($self, $datasource, $query_json) = @_;
+  my ($query_fh, $query_file) = File::Temp::tempfile(UNLINK => 1, TEMPLATE => "iap-test-tranq-XXXXX");
+  print $query_fh $query_json;
+  close $query_fh;
+
+  return retry(sub {
+    my $rsp = JSON::decode_json($self->backtick([
+      "curl",
+      "-f",
+      "-L",
+      "-HContent-Type: application/json",
+      "-XPOST",
+      "--data-binary", '@' . File::Spec->rel2abs($query_file),
+      "http://localhost:8200/v1/post/$datasource"
+    ]));
+    return $rsp;
+  }, tries => 60);
 }
 
 sub down
