@@ -26,37 +26,38 @@ my $druid_result_minus_id = $iap->query_druid({
   queryType => 'segmentMetadata',
   dataSource => 'wikiticker',
   merge => JSON::true,
-  analysisTypes => []
+  analysisTypes => ['INTERVAL']
 });
 
 delete $druid_result_minus_id->[0]{id};
 
 my $druid_expected_minus_id = [{
   "columns" => {
-     "__time" => {"cardinality" => undef, "errorMessage" => undef, "size" => 0, "type" => "LONG"},
-     "added" => {"cardinality" => undef, "errorMessage" => undef, "size" => 0, "type" => "LONG"},
-     "channel" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING"},
-     "cityName" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING"},
-     "comment" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING"},
-     "count" => {"cardinality" => undef, "errorMessage" => undef, "size" => 0, "type" => "LONG"},
-     "countryIsoCode" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING"},
-     "countryName" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING"},
-     "deleted" => {"cardinality" => undef, "errorMessage" => undef, "size" => 0, "type" => "LONG"},
-     "delta" => {"cardinality" => undef, "errorMessage" => undef, "size" => 0, "type" => "LONG"},
-     "isAnonymous" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING"},
-     "isMinor" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING"},
-     "isNew" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING"},
-     "isRobot" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING"},
-     "isUnpatrolled" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING"},
-     "metroCode" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING"},
-     "namespace" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING"},
-     "page" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING"},
-     "regionIsoCode" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING"},
-     "regionName" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING"},
-     "user" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING"},
-     "user_unique" => {"cardinality" => undef, "errorMessage" => undef, "size" => 0, "type" => "hyperUnique"}
+     "__time" => {"cardinality" => undef, "errorMessage" => undef, "size" => 0, "type" => "LONG", "hasMultipleValues" => $JSON::false},
+     "added" => {"cardinality" => undef, "errorMessage" => undef, "size" => 0, "type" => "LONG", "hasMultipleValues" => $JSON::false},
+     "channel" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING", "hasMultipleValues" => $JSON::false},
+     "cityName" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING", "hasMultipleValues" => $JSON::false},
+     "comment" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING", "hasMultipleValues" => $JSON::false},
+     "count" => {"cardinality" => undef, "errorMessage" => undef, "size" => 0, "type" => "LONG", "hasMultipleValues" => $JSON::false},
+     "countryIsoCode" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING", "hasMultipleValues" => $JSON::false},
+     "countryName" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING", "hasMultipleValues" => $JSON::false},
+     "deleted" => {"cardinality" => undef, "errorMessage" => undef, "size" => 0, "type" => "LONG", "hasMultipleValues" => $JSON::false},
+     "delta" => {"cardinality" => undef, "errorMessage" => undef, "size" => 0, "type" => "LONG", "hasMultipleValues" => $JSON::false},
+     "isAnonymous" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING", "hasMultipleValues" => $JSON::false},
+     "isMinor" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING", "hasMultipleValues" => $JSON::false},
+     "isNew" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING", "hasMultipleValues" => $JSON::false},
+     "isRobot" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING", "hasMultipleValues" => $JSON::false},
+     "isUnpatrolled" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING", "hasMultipleValues" => $JSON::false},
+     "metroCode" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING", "hasMultipleValues" => $JSON::false},
+     "namespace" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING", "hasMultipleValues" => $JSON::false},
+     "page" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING", "hasMultipleValues" => $JSON::false},
+     "regionIsoCode" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING", "hasMultipleValues" => $JSON::false},
+     "regionName" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING", "hasMultipleValues" => $JSON::false},
+     "user" => {"cardinality" => 0, "errorMessage" => undef, "size" => 0, "type" => "STRING", "hasMultipleValues" => $JSON::false},
+     "user_unique" => {"cardinality" => undef, "errorMessage" => undef, "size" => 0, "type" => "hyperUnique", "hasMultipleValues" => $JSON::false}
   },
   "intervals" => ["2015-09-12T00:00:00.000Z/2015-09-13T00:00:00.000Z"],
+  "numRows" => 39244,
   "size" => 0
 }];
 
