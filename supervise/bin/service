@@ -3,6 +3,7 @@
 use strict;
 use warnings;
 
+use Cwd qw/realpath/;
 use Fcntl;
 use File::Basename;
 use FindBin;
@@ -10,16 +11,17 @@ use Getopt::Long qw/:config require_order gnu_compat/;
 
 sub usage
 {
-  die "usage: $0 (--restart <service> | --down | --command <other command>) [-S <service dir>]\n";
+  die "usage: $0 (--restart <service> | --tail <service> | --down) [-d <var dir>]\n";
 }
 
 # Parse arguments
 my %opt = (
-  'svdir' => "$FindBin::Bin/../var/sv",
+  'vardir' => realpath("$FindBin::Bin/../var"),
 );
 
-usage() unless GetOptions(\%opt, 'command=s', 'restart=s', 'down', 'svdir|S=s');
+usage() unless GetOptions(\%opt, 'command=s', 'restart=s', 'down', 'tail=s', 'vardir|d=s');
 
+my $svdir = "$opt{vardir}/sv";
 my $command;
 
 if ($opt{command}) {
@@ -37,9 +39,15 @@ if ($opt{restart}) {
   $command = "k $opt{restart}";
 }
 
+if ($opt{tail}) {
+  usage() if $command;
+  exec "tail", "-f", "$svdir/$opt{tail}.log"
+    or die "exec failed: $!\n";
+}
+
 usage() unless $command;
 
-my $fifofile = "$opt{svdir}/.ctrl";
+my $fifofile = "$svdir/.ctrl";
 sysopen my $fifofh, $fifofile, O_WRONLY or die "Can't open control fifo, perhaps supervise is not running: $!\n";
 print $fifofh "$command\n";
 close $fifofh;
