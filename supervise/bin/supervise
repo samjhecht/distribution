@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 use Cwd qw/realpath/;
-use POSIX qw/:sys_wait_h mkfifo/;
+use POSIX qw/:sys_wait_h mkfifo setsid/;
 use Fcntl qw/:DEFAULT :flock/;
 use Getopt::Long qw/:config require_order gnu_compat/;
 use FindBin;
@@ -41,9 +41,15 @@ sub read_config_file
     chomp $line;
     next if $line =~ /^(\s*\#.*|\s*)$/;
 
-    if ($line =~ /^(:verify|[^:]\S+)\s+(.+)$/) {
+    if ($line =~ /^(:verify|(?:\!p[0-9]+\s+)?[^:]\S+)\s+(.+)$/) {
       my $name = $1;
+      my $order = 50;
       my $command = $2;
+
+      if ($name =~ /^(?:\!p([0-9]+)\s+)(.*)$/) {
+        $order = $1;
+        $name = $2;
+      }
 
       if ($name eq ':verify') {
         push @verify, $command;
@@ -52,9 +58,11 @@ sub read_config_file
         push @commands, {
           name => $name,
           command => $command,
-          pid => 0,      # Current pid, or 0 if not running
-          down => 0,     # Time the proc should be down until
-          killed => 0,   # Signal we sent to this process
+          order => $order,  # Stop order for this command
+          pid => 0,         # Current pid, or 0 if not running
+          down => 0,        # Time the proc should be down until
+          killed => 0,      # Signal we sent to this process
+          restarting => 0,  # True if this command is currently restarting
         };
       }
     } else {
@@ -116,8 +124,15 @@ sub pretty
 }
 
 my @commands;
+
+# If nonzero we should be exiting. -1 means exit without signal, >0 means exit with signal
 my $killed = 0;
+
+# If >0 then kill -9 all procs at this time
 my $killkill = 0;
+
+# Current proc order we're stopping. Ignored unless $killed is nonzero
+my $stopping = 100;
 
 # We'll do our own reaping
 $SIG{CHLD} = sub {};
@@ -188,9 +203,6 @@ $SIG{TERM} = sub { if (!$killed) { $killed = 15; $killkill = time + $opt{'kill-t
 # Build up control fifo command over multiple sysreads, potentially
 my $fifobuffer = '';
 
-# Command names currently restarting, so we can avoid printing 'failed' messages
-my %restarting;
-
 while (1) {
   # Spawn new procs
   if (!$killed) {
@@ -204,6 +216,7 @@ while (1) {
           $command->{pid} = $pid;
           $command->{logfile} = $logfile;
         } else {
+          setsid;
           open STDOUT, ">>", $logfile or logdie "open $logfile failed: $!\n";
           open STDERR, ">&STDOUT" or logdie "redirecting stderr failed: $!\n";
           exec('sh', '-c', "exec $command->{command}") or logdie "exec [$command->{command}] failed: $!";
@@ -221,11 +234,11 @@ while (1) {
       $command->{pid} = 0;
       $command->{down} = time + 2;
       logit "Command[" . pretty($command->{name}, 'bold') . "] exited (pid = $pid, " . stringify_exit_status($status) . ")";
-      if (($status >> 8) && !$killed && !$restarting{$command->{name}}) {
-        # Nonzero exit status
+      if ($status && !$killed && !$command->{restarting}) {
+        # Unexpected exit
         logit "Command[" . pretty($command->{name}, 'bold') . "] " . pretty("failed", "red") . ", see logfile for more details: $command->{logfile}";
       }
-      delete $restarting{$command->{name}};
+      $command->{restarting} = 0;
     } else {
       logit "ERR: Reaped unknown command (pid = $pid, " . stringify_exit_status($status) . ")";
     }
@@ -233,8 +246,25 @@ while (1) {
 
   # Kill procs, maybe
   if ($killed) {
-    for my $command (grep { $_->{pid} } @commands) {
-      my $should_killkill = time > $killkill;
+    my $should_killkill = time > $killkill;
+
+    # Update stopping position, maybe
+    if ($should_killkill) {
+      $stopping = 0;
+    } else {
+      my $maxorder = 0;
+      for my $command (grep { $_->{pid} } @commands) {
+        if ($command->{order} > $maxorder) {
+          $maxorder = $command->{order};
+        }
+      }
+
+      if ($maxorder < $stopping) {
+        $stopping = $maxorder;
+      }
+    }
+
+    for my $command (grep { $_->{pid} && $_->{order} >= $stopping } @commands) {
       my $want_signal;
       if ($command->{killed} == 9 || $should_killkill) {
         $want_signal = 9;
@@ -277,7 +307,7 @@ while (1) {
         if ($command) {
           logit "Restarting command[" . pretty($name, "bold") . "].";
           if (kill TERM => $command->{pid}) {
-            $restarting{$name} = 1;
+            $command->{restarting} = 1;
           } else {
             logit "WARN: Could not signal pid: $command->{pid}"
           }
