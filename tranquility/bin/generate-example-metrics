@@ -23,7 +23,13 @@ def main():
     else:
       page = '/get/' + str(random.randint(1, 99))
 
-    server = 'www' + str(random.randint(1, 5)) + '.example.com'
+    s = random.randint(1,2)
+    if s = 1:
+      t = 's'
+    else:
+      t = ''
+
+    server = 'www.unicorn' + t + 'say.com'
 
     latency = max(1, random.gauss(80, 40))
 
